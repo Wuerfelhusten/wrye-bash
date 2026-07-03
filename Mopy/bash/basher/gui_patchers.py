@@ -257,7 +257,7 @@ class _ListPatcherPanel(_PatcherPanel):
         self._new_items: set[FName] = set()
 
     def native_init(self, *args, **kwargs):
-        if freshly_created :=  super().native_init(*args, **kwargs):
+        if freshly_created := super().native_init(*args, **kwargs):
             self.selectCommands = self.__class__.selectCommands
             self._get_glist()
             self._item_search = SearchBar(self, hint=_('Search Sources'))
