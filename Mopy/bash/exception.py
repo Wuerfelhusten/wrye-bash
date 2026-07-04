@@ -33,6 +33,21 @@ class BoltError(Exception):
     def __str__(self):
         return self.message
 
+# Boot exceptions -------------------------------------------------------
+class LoadOrderBootError(Exception):
+    """A problem with the load order was detected during boot, and WB was
+    instructed to terminate rather than deprint."""
+    lo_error: str
+    acti_error: str
+
+    def __init__(self, lo_error: str, acti_error: str):
+        self.lo_error = lo_error
+        self.acti_error = acti_error
+        super().__init__('\n'.join(self.get_lo_errors()))
+
+    def get_lo_errors(self) -> list[str]:
+        return [x for x in (self.lo_error, self.acti_error) if x]
+
 # Code errors -----------------------------------------------------------------
 class ArgumentError(BoltError):
     """Coding Error: Argument out of allowed range of values."""

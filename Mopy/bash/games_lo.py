@@ -201,22 +201,29 @@ class _FixInfo:
             or self.missing_must_be_active or self.selectedExtra)
 
     def lo_deprint(self):
-        self._warn_lo()
-        self._warn_active()
+        lo_warning = self._get_lo_warning()
+        if lo_warning:
+            deprint(lo_warning)
+        acti_warning = self._get_acti_warning()
+        if acti_warning:
+            deprint(acti_warning)
 
-    def _warn_lo(self):
-        if not self.lo_changed(): return
+    def get_fix_warnings(self) -> tuple[str, str]:
+        return self._get_lo_warning(), self._get_acti_warning()
+
+    def _get_lo_warning(self) -> str:
+        if not self.lo_changed(): return ''
         msg = [_pl(li, f'{at[3:]}: ') for at in ('lo_removed', 'lo_added',
             'lo_duplicates') if (li := getattr(self, at))]
         if any(self.lo_reordered):
             msg.append('reordered:')
             msg.append(_pl(self.lo_reordered[0], 'from: '))
             msg.append(_pl(self.lo_reordered[1], 'to  : '))
-        fixed_lo_msg = '\n'.join(msg)
-        bolt.deprint(f'Fixed Load Order: {fixed_lo_msg}')
+        msg = '\n'.join(msg)
+        return f'Fixed Load Order: {msg}'
 
-    def _warn_active(self):
-        if not self.act_header: return
+    def _get_acti_warning(self) -> str:
+        if not self.act_header: return ''
         msg = [self.act_header]
         if self.act_removed:
             msg.append('Active list contains mods not present in Data '
@@ -234,7 +241,7 @@ class _FixInfo:
         if self.act_duplicates:
             msg.append('Removed duplicate entries from active list:')
             msg.append(', '.join(self.act_duplicates))
-        bolt.deprint('\n'.join(msg))
+        return '\n'.join(msg)
 
 class LoGame:
     """API for setting, getting and validating the active plugins and the
@@ -259,8 +266,8 @@ class LoGame:
 
     # API: Get and helpers ----------------------------------------------------
     def get_load_order(self, cached_load_order: LoTuple | None,
-                       cached_active_ordered: LoTuple | None, rdata_mods) -> \
-            tuple[LoList, LoList, _FixInfo]:
+            cached_active_ordered: LoTuple | None, rdata_mods, *,
+            booting=False) -> tuple[LoList, LoList, _FixInfo]:
         """Get and validate current load order and active plugins information.
 
         ***Only*** called in ModInfos.refresh to fetch load order and active
@@ -293,11 +300,12 @@ class LoGame:
             if rdata_mods.redraw: # plugin flag changed? - check active limits
                 self.check_active_limit(active, fix_active=fix_lo,
                                         filter_list=active)
+        # If we're booting and told to exit on error, we need to do that before
+        # persisting
+        self._log_and_check_boot_error(fix_lo, booting=booting)
         savact = None if fix_lo.act_changed() or fix_lo.do_save_act else active
         savlo = None if fix_lo.lo_changed() or fix_lo.do_save_lo else lo
         self._persist_if_changed(lo, savlo, active, savact, fixlo=fix_lo)
-        for msg in fix_lo.do_save_lo, fix_lo.do_save_act:
-            if msg: bolt.deprint(msg)
         return [*lo], [*active], fix_lo
 
     def _cached_or_fetch(self, cached_active, cached_load_order, *, fix_lo,
@@ -636,6 +644,14 @@ class LoGame:
             bolt.deprint(f' - Active plugins: {acti_lo.pop(0)}')
             if acti_lo:
                 bolt.deprint(f' - Load order: {acti_lo.pop(0)}')
+
+    @staticmethod
+    def _log_and_check_boot_error(fix_lo: _FixInfo, *, booting=False):
+        for msg in fix_lo.do_save_lo, fix_lo.do_save_act:
+            if msg: bolt.deprint(msg)
+        fix_lo.lo_deprint()
+        if booting and bass.inisettings['ExitOnLOBootError']:
+            raise exception.LoadOrderBootError(*fix_lo.get_fix_warnings())
 
 def _mk_ini(ini_key, star, ini_fpath):
     """Creates a new IniFile from the specified bolt.Path object."""
