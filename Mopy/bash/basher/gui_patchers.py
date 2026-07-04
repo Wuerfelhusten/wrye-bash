@@ -286,10 +286,9 @@ class _ListPatcherPanel(_PatcherPanel):
                 self.gAuto = CheckBox(self, _('Automatic'),
                                       checked=self.autoIsChecked)
                 self.gAuto.on_checked.subscribe(self.OnAutomatic)
-                self.gAdd = Button(self, _('Add'))
-                self.gAdd.on_clicked.subscribe(self.OnAdd)
-                self.gRemove = Button(self, _('Remove'))
-                self.gRemove.on_clicked.subscribe(self.OnRemove)
+                self.gAdd = Button(self, _('Add'), on_click=self.OnAdd)
+                self.gRemove = Button(self, _('Remove'),
+                                      on_click=self.OnRemove)
                 right_side_components.extend([self.gAuto, Spacer(4), self.gAdd,
                                               self.gRemove])
                 self.OnAutomatic(self.autoIsChecked)
@@ -355,11 +354,11 @@ class _ListPatcherPanel(_PatcherPanel):
     def _get_select_layout(self):
         if not self.selectCommands: return None
         self.gSelectAll = SelectAllButton(self, btn_tooltip=_(
-            'Activate all currently visible sources.'))
-        self.gSelectAll.on_clicked.subscribe(lambda: self.mass_select(True))
+            'Activate all currently visible sources.'),
+            on_click=lambda: self.mass_select(True))
         self.gDeselectAll = DeselectAllButton(self, btn_tooltip=_(
-            'Deactivate all currently visible sources.'))
-        self.gDeselectAll.on_clicked.subscribe(lambda: self.mass_select(False))
+            'Deactivate all currently visible sources.'),
+            on_click=lambda: self.mass_select(False))
         return VLayout(spacing=4, items=[self.gSelectAll, self.gDeselectAll])
 
     def _populate_item_list(self):
@@ -595,13 +594,11 @@ class _TweakPatcherPanel(_ChoiceMenuMixin, _PatcherPanel):
     def _get_tweak_select_layout(self):
         if self.selectCommands:
             self.gTweakSelectAll = SelectAllButton(self, btn_tooltip=_(
-                'Activate all currently visible tweaks.'))
-            self.gTweakSelectAll.on_clicked.subscribe(
-                lambda: self.mass_select(True))
+                'Activate all currently visible tweaks.'),
+                on_click=lambda: self.mass_select(True))
             self.gTweakDeselectAll = DeselectAllButton(self, btn_tooltip=_(
-                'Deactivate all currently visible tweaks.'))
-            self.gTweakDeselectAll.on_clicked.subscribe(
-                lambda: self.mass_select(False))
+                'Deactivate all currently visible tweaks.'),
+                on_click=lambda: self.mass_select(False))
             tweak_select_layout = VLayout(spacing=4, items=[
                 self.gTweakSelectAll, self.gTweakDeselectAll])
         else: tweak_select_layout = None
