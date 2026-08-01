@@ -484,7 +484,7 @@ def main(opts: Namespace):
         # Make sure we actually have a functional 'bash' folder to work with
         _warn_missing_bash_dir()
         # Early setup is done, delegate to the main init method
-        _main(opts, wx_locale, __wx)
+        _main(opts, localize)
     except Exception as e:
         caught_exc = traceback.format_exc()
         if isinstance(e, exception.BootError):
@@ -515,23 +515,23 @@ def main(opts: Namespace):
                         'official thread at %(thread_url)s or to the Wrye '
                         'Bash Discord at %(discord_url)s')
             err_msg += '\n\n' + caught_exc
-        _show_boot_popup(__wx, err_msg % _help_urls)
+        _show_boot_popup(err_msg % _help_urls)
 
-def _main(opts, wx_locale, _wx):
+def _main(opts, localize):
     """Run the Wrye Bash main loop.
 
     This function is marked private because it should be inside a try-except
     block. Call main() from the outside.
 
     :param opts: command line arguments
-    :param wx_locale: The wx.Locale object that we ended up using."""
+    :param localize: localize.py module"""
     # Initialize gui, our wrapper above wx (also balt, temp module) and
     # load the window icon resources now that we have an app instance
     from . import balt, gui
     balt.load_app_icons()
     # Check for some non-critical dependencies (e.g. lz4) and warn if
     # they're missing now that we can show nice app icons
-    _import_deps(_wx)
+    _import_deps()
     # barg doesn't import anything else, so can be imported whenever we want
     from . import barg
     bass.sys_argv = barg.convert_to_long_options(sys.argv)
@@ -555,7 +555,7 @@ def _main(opts, wx_locale, _wx):
             restore_ = None
     # The rest of backup/restore functionality depends on setting the game
     try:
-        bush_game, game_ini_path = _detect_game(_wx, opts, bash_ini_path)
+        bush_game, game_ini_path = _detect_game(opts, bash_ini_path)
         if not bush_game: return
         if restore_:
             try:
@@ -573,7 +573,7 @@ def _main(opts, wx_locale, _wx):
                 # _detect_game -> _import_bush_and_set_game
                 from . import bush
                 bush.reset_bush_globals()
-                bush_game, game_ini_path = _detect_game(_wx, opts, 'bash.ini')
+                bush_game, game_ini_path = _detect_game(opts, 'bash.ini')
         from . import bosh
         bosh.initBosh(game_ini_path, bush_game)
         # hacky should maybe be somewhere else
@@ -588,10 +588,9 @@ def _main(opts, wx_locale, _wx):
         from . import basher
         bosh.initSettings(basher.askYes)
     except (exception.BoltError, ImportError, OSError, NotImplementedError):
-        msg = u'\n'.join([_(u'Error! Unable to start Wrye Bash.'), u'\n', _(
-            u'Please ensure Wrye Bash is correctly installed.'), u'\n',
-                          traceback.format_exc()])
-        _show_boot_popup(_wx, msg)
+        msg = [_('Error! Unable to start Wrye Bash.'), '\n', _('Please ensure '
+            'Wrye Bash is correctly installed.'), '\n', traceback.format_exc()]
+        _show_boot_popup('\n'.join(msg))
         return # _show_boot_popup calls sys.exit, this gets pycharm to shut up
     atexit.register(exit_cleanup)
     basher.InitSettings()
@@ -656,9 +655,8 @@ def _main(opts, wx_locale, _wx):
         frame = basher.Init(bash_app)  # Link.Frame is set here !
     except Exception as e:
         if problems := _detect_known_boot_problems(e):
-            msg = [_('The following problems were found during boot:'), '',
-                   *(f'- {e}' for e in problems)]
-            _show_boot_popup(_wx, '\n'.join(msg))
+            m = _('The following problems were found during boot:')
+            _show_boot_popup('\n'.join([m, '', *(f'- {e}' for e in problems)]))
         raise e
     frame.ensureDisplayed()
     frame.bind_refresh()
@@ -667,7 +665,7 @@ def _main(opts, wx_locale, _wx):
     frame.start_update_check()
     bash_app.MainLoop()
 
-def _detect_game(__wx, opts, backup_bash_ini):
+def _detect_game(opts, backup_bash_ini):
     # Generate the bash_default.ini file
     gen_ini.write_default_bash_ini()
     # Read the bash.ini file either from Mopy or from the backup location
@@ -680,10 +678,10 @@ def _detect_game(__wx, opts, backup_bash_ini):
         os.environ[u'HOMEDRIVE'] = homedrive
         os.environ[u'HOMEPATH'] = homepath
     # Detect the game we're running for ---------------------------------------
-    bush_game = _import_bush_and_set_game(__wx, opts)
+    bush_game = _import_bush_and_set_game(opts)
     return (bush_game, bush_game.game_ini_path) if bush_game else (None, None)
 
-def _import_bush_and_set_game(__wx, opts):
+def _import_bush_and_set_game(opts):
     from . import bush
     bolt.deprint(u'Searching for game to manage:')
     # Warnings found during game dirs initialization are added here as strings
@@ -714,10 +712,10 @@ def _import_bush_and_set_game(__wx, opts):
         warning_msg = [
             _('The following (non-critical) warnings were found during '
               'initialization:'), '', *(f'- {w}' for w in init_warnings)]
-        _show_boot_popup(__wx, '\n'.join(warning_msg), is_critical=False)
+        _show_boot_popup('\n'.join(warning_msg), is_critical=False)
     return bush.game
 
-def _show_boot_popup(__wx, msg, is_critical=True):
+def _show_boot_popup(msg, is_critical=True):
     """Shows an error message in a popup window. If is_critical, exit the
     application afterwards. Must only be called after _import_wx, setup_locale
     and gui is imported."""
@@ -774,14 +772,15 @@ def _show_boot_popup(__wx, msg, is_critical=True):
     root_widget.mainloop()
     sys.exit(1)
 
-def _close_dialog_windows(_wx):
+def _close_dialog_windows():
     """Close any additional windows opened by wrye bash (e.g Splash, Dialogs).
     Must only be called after _import_wx.
 
     This will not close the main bash window (BashFrame) because closing that
     results in virtual function call exceptions."""
+    top_level_wins = _wx.GetTopLevelWindows() #raise AttributeError if _wx=None
     import wx.adv as adv # could we just use _wx.adv?
-    for window in _wx.GetTopLevelWindows():
+    for window in top_level_wins:
         if basher is None or not isinstance(window, basher.BashFrame):
             if isinstance(window, _wx.Dialog):
                 window.Destroy()
